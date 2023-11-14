@@ -15,3 +15,44 @@ def calculate_ichimoku(df):
     df['chikou_span'] = close_prices.shift(-26)
     return df
 
+
+def convert_to_polarity(value):
+    # check if null
+    if value == value:
+        if value > 0:
+            return 1
+        elif value < 0:
+            return -1
+        else:
+            return 0
+    else:
+        return value
+
+
+def calculate_rmi(data, time_period=14, momentum_period=5):
+    """
+    Calculate the Relative Momentum Index (RMI) for a given Pandas Series.
+
+    :param data: Pandas Series of prices.
+    :param time_period: The period for calculating RMI. Default is 14.
+    :param momentum_period: The period for calculating momentum. Default is 5.
+    :return: Pandas Series of RMI values.
+    """
+    # Calculate momentum
+    momentum = data.diff(momentum_period)
+
+    # Calculate gains and losses
+    gain = momentum.clip(lower=0)
+    loss = -momentum.clip(upper=0)
+
+    # Calculate average gains and losses
+    avg_gain = gain.rolling(window=time_period, min_periods=time_period).mean()
+    avg_loss = loss.rolling(window=time_period, min_periods=time_period).mean()
+
+    # Calculate RS (Relative Strength)
+    RS = avg_gain / avg_loss
+
+    # Calculate RMI
+    RMI = 100 - (100 / (1 + RS))
+
+    return RMI
