@@ -1,0 +1,21 @@
+name: Jupyter Notebook Test
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.11'
+
+    - name: Run Jupyter Notebook
+      env:
+        TEST_ENV: 'true'
+      run: |
+        jupyter nbconvert --to notebook --execute src/studies/ichimoku_cloud/ichimoku_cloud_random_forrest.ipynb

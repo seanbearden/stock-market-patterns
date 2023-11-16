@@ -1,4 +1,5 @@
 import datetime
+import os
 import pandas as pd
 import pytz
 from statsmodels.tsa.stattools import adfuller
@@ -49,7 +50,12 @@ def get_earnings_dates(df):
 
     return earnings_dates_eastern_time
 
+
 def process_data(data_path, days_into_future=10):
+    # Use reduced data file for testing
+    if os.environ.get('TEST_ENV') == 'true':
+        data_path = '../../../res/data/s_and_p_study_data_TESTING.h5'
+
     dataframe_keys = get_dataframe_keys(data_path)
     prices_dataframe_keys = [k for k in dataframe_keys if 'prices/' in k]
     events_dataframe_keys = [k for k in dataframe_keys if 'events/' in k]
@@ -66,12 +72,13 @@ def process_data(data_path, days_into_future=10):
         'senkou_span_b']
 
     spy_features = ['spy_close_diff_tenkan_sen_percent', 'spy_close_diff_kijun_sen_percent',
-                 'spy_close_diff_senkou_span_a_percent', 'spy_close_diff_senkou_span_b_percent']
+                    'spy_close_diff_senkou_span_a_percent', 'spy_close_diff_senkou_span_b_percent']
 
     df_dict = {}
     dropped_symbols = []
+
     for key in prices_dataframe_keys:
-        print(key)
+        # print(key)
         symbol = key.split('/')[-1]
         df = pd.read_hdf(data_path, key)
         df = make_index_eastern(df)
@@ -80,7 +87,7 @@ def process_data(data_path, days_into_future=10):
 
         # tech debt: perform this conversion when saving events to h5
         # get earnings dates
-        events_key = f'/ıevents/{symbol}'
+        events_key = f'/events/{symbol}'
         if events_key in events_dataframe_keys:
             events_df = pd.read_hdf(data_path, events_key)
             earnings_dates_eastern_time = get_earnings_dates(events_df)
@@ -148,7 +155,6 @@ def process_data(data_path, days_into_future=10):
         df.loc[:, 'close_diff_kijun_sen_percent'] = (df['close'] - df['kijun_sen']) / df['kijun_sen']
         df.loc[:, 'close_diff_senkou_span_a_percent'] = (df['close'] - df['senkou_span_a']) / df['senkou_span_a']
         df.loc[:, 'close_diff_senkou_span_b_percent'] = (df['close'] - df['senkou_span_b']) / df['senkou_span_b']
-
 
         target_col = f'highest_close_next_{days_into_future}_days_percent'
         # df.loc[:, target_col] = df['close'].pct_change(offset)
