@@ -1,0 +1,102 @@
+Ticker,Company,Sector,Industry
+AAPL,Apple Inc,Technology,Consumer Electronics
+ABNB,Airbnb Inc,Consumer Cyclical,Travel Services
+ADBE,Adobe Inc,Technology,Software - Infrastructure
+ADI,Analog Devices Inc.,Technology,Semiconductors
+ADP,Automatic Data Processing Inc.,Industrials,Staffing & Employment Services
+ADSK,Autodesk Inc.,Technology,Software - Application
+AEP,American Electric Power Company Inc.,Utilities,Utilities - Regulated Electric
+ALGN,"Align Technology, Inc.",Healthcare,Medical Devices
+AMAT,Applied Materials Inc.,Technology,Semiconductor Equipment & Materials
+AMD,Advanced Micro Devices Inc.,Technology,Semiconductors
+AMGN,AMGEN Inc.,Healthcare,Drug Manufacturers - General
+AMZN,Amazon.com Inc.,Consumer Cyclical,Internet Retail
+ANSS,Ansys Inc.,Technology,Software - Application
+ASML,ASML Holding NV,Technology,Semiconductor Equipment & Materials
+AVGO,Broadcom Inc,Technology,Semiconductors
+AZN,Astrazeneca plc ADR,Healthcare,Drug Manufacturers - General
+BIIB,Biogen Inc,Healthcare,Drug Manufacturers - General
+BKNG,Booking Holdings Inc,Consumer Cyclical,Travel Services
+BKR,Baker Hughes Co,Energy,Oil & Gas Equipment & Services
+CDNS,"Cadence Design Systems, Inc.",Technology,Software - Application
+CEG,Constellation Energy Corporation,Utilities,Utilities - Renewable
+CHTR,Charter Communications Inc.,Communication Services,Telecom Services
+CMCSA,Comcast Corp,Communication Services,Telecom Services
+COST,Costco Wholesale Corp,Consumer Defensive,Discount Stores
+CPRT,"Copart, Inc.",Industrials,Specialty Business Services
+CRWD,Crowdstrike Holdings Inc,Technology,Software - Infrastructure
+CSCO,"Cisco Systems, Inc.",Technology,Communication Equipment
+CSGP,"Costar Group, Inc.",Real Estate,Real Estate Services
+CSX,CSX Corp.,Industrials,Railroads
+CTAS,Cintas Corporation,Industrials,Specialty Business Services
+CTSH,Cognizant Technology Solutions Corp.,Technology,Information Technology Services
+DDOG,Datadog Inc,Technology,Software - Application
+DLTR,Dollar Tree Inc,Consumer Defensive,Discount Stores
+DXCM,Dexcom Inc,Healthcare,Medical Devices
+EA,"Electronic Arts, Inc.",Communication Services,Electronic Gaming & Multimedia
+EBAY,EBay Inc.,Consumer Cyclical,Internet Retail
+ENPH,Enphase Energy Inc,Technology,Solar
+EXC,Exelon Corp.,Utilities,Utilities - Regulated Electric
+FANG,Diamondback Energy Inc,Energy,Oil & Gas E&P
+FAST,Fastenal Co.,Industrials,Industrial Distribution
+FTNT,Fortinet Inc,Technology,Software - Infrastructure
+GEHC,GE HealthCare Technologies Inc,Healthcare,Health Information Services
+GFS,GlobalFoundries Inc,Technology,Semiconductors
+GILD,"Gilead Sciences, Inc.",Healthcare,Drug Manufacturers - General
+GOOG,Alphabet Inc,Communication Services,Internet Content & Information
+GOOGL,Alphabet Inc,Communication Services,Internet Content & Information
+HON,Honeywell International Inc,Industrials,Conglomerates
+IDXX,"Idexx Laboratories, Inc.",Healthcare,Diagnostics & Research
+ILMN,Illumina Inc,Healthcare,Diagnostics & Research
+INTC,Intel Corp.,Technology,Semiconductors
+INTU,Intuit Inc,Technology,Software - Application
+ISRG,Intuitive Surgical Inc,Healthcare,Medical Instruments & Supplies
+JD,JD.com Inc ADR,Consumer Cyclical,Internet Retail
+KDP,Keurig Dr Pepper Inc,Consumer Defensive,Beverages - Non-Alcoholic
+KHC,Kraft Heinz Co,Consumer Defensive,Packaged Foods
+KLAC,KLA Corp.,Technology,Semiconductor Equipment & Materials
+LCID,Lucid Group Inc,Consumer Cyclical,Auto Manufacturers
+LRCX,Lam Research Corp.,Technology,Semiconductor Equipment & Materials
+LULU,Lululemon Athletica inc.,Consumer Cyclical,Apparel Retail
+MAR,"Marriott International, Inc.",Consumer Cyclical,Lodging
+MCHP,"Microchip Technology, Inc.",Technology,Semiconductors
+MDLZ,Mondelez International Inc.,Consumer Defensive,Confectioners
+MELI,MercadoLibre Inc,Consumer Cyclical,Internet Retail
+META,Meta Platforms Inc,Communication Services,Internet Content & Information
+MNST,Monster Beverage Corp.,Consumer Defensive,Beverages - Non-Alcoholic
+MRNA,Moderna Inc,Healthcare,Biotechnology
+MRVL,Marvell Technology Inc,Technology,Semiconductors
+MSFT,Microsoft Corporation,Technology,Software - Infrastructure
+MU,Micron Technology Inc.,Technology,Semiconductors
+NFLX,Netflix Inc.,Communication Services,Entertainment
+NVDA,NVIDIA Corp,Technology,Semiconductors
+NXPI,NXP Semiconductors NV,Technology,Semiconductors
+ODFL,"Old Dominion Freight Line, Inc.",Industrials,Trucking
+ON,ON Semiconductor Corp.,Technology,Semiconductors
+ORLY,"O'Reilly Automotive, Inc.",Consumer Cyclical,Specialty Retail
+PANW,Palo Alto Networks Inc,Technology,Software - Infrastructure
+PAYX,Paychex Inc.,Industrials,Staffing & Employment Services
+PCAR,Paccar Inc.,Industrials,Farm & Heavy Construction Machinery
+PDD,PDD Holdings Inc ADR,Consumer Cyclical,Internet Retail
+PEP,PepsiCo Inc,Consumer Defensive,Beverages - Non-Alcoholic
+PYPL,PayPal Holdings Inc,Financial,Credit Services
+QCOM,"Qualcomm, Inc.",Technology,Semiconductors
+REGN,"Regeneron Pharmaceuticals, Inc.",Healthcare,Biotechnology
+ROST,"Ross Stores, Inc.",Consumer Cyclical,Apparel Retail
+SBUX,Starbucks Corp.,Consumer Cyclical,Restaurants
+SGEN,Seagen Inc,Healthcare,Biotechnology
+SIRI,Sirius XM Holdings Inc,Communication Services,Entertainment
+SNPS,"Synopsys, Inc.",Technology,Software - Infrastructure
+TEAM,Atlassian Corporation,Technology,Software - Application
+TMUS,T-Mobile US Inc,Communication Services,Telecom Services
+TSLA,Tesla Inc,Consumer Cyclical,Auto Manufacturers
+TTD,Trade Desk Inc,Technology,Software - Application
+TXN,Texas Instruments Inc.,Technology,Semiconductors
+VRSK,Verisk Analytics Inc,Industrials,Consulting Services
+VRTX,"Vertex Pharmaceuticals, Inc.",Healthcare,Biotechnology
+WBA,Walgreens Boots Alliance Inc,Healthcare,Pharmaceutical Retailers
+WBD,Warner Bros. Discovery Inc,Communication Services,Entertainment
+WDAY,Workday Inc,Technology,Software - Application
+XEL,"Xcel Energy, Inc.",Utilities,Utilities - Regulated Electric
+ZM,Zoom Video Communications Inc,Technology,Software - Application
+ZS,Zscaler Inc,Technology,Software - Infrastructure
