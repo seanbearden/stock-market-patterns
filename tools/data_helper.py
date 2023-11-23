@@ -1,4 +1,5 @@
 import datetime
+import numpy as np
 import os
 import pandas as pd
 import pytz
@@ -17,7 +18,7 @@ def days_since_earnings(date, earnings_dates):
         last_earnings_date = past_earnings_dates.max()
         return (date - last_earnings_date).days + 1
     else:
-        return pd.NA
+        return np.NaN
 
 
 def get_dataframe_keys(data_path):
@@ -51,7 +52,7 @@ def get_earnings_dates(df):
     return earnings_dates_eastern_time
 
 
-def process_data(data_path, days_into_future=10):
+def process_data(data_path):
     # Use reduced data file for testing
     if os.environ.get('TEST_ENV') == 'true':
         data_path = '../../../res/data/s_and_p_study_data_TESTING.h5'
@@ -99,6 +100,11 @@ def process_data(data_path, days_into_future=10):
         # tech debt: change to days UNTIL earnings. Requires alpha vantage to get date. Need solution for when date is unknown...
         # Apply the function to each date in df
         df['days_since_earnings'] = df.index.map(lambda date: days_since_earnings(date, earnings_dates_eastern_time))
+        df['days_since_earnings'].astype(float)
+
+        # Introduce seasonality
+        df.loc[:, 'month'] = df.index.month
+        df['month'] = df['month'].astype(float)
 
         # Technical Indicators
         df['rsi'] = talib.RSI(df['close'], timeperiod=14)
@@ -124,8 +130,11 @@ def process_data(data_path, days_into_future=10):
         # Relative Dividend
         df['dividend_amount_to_close'] = 100 * df['dividend_amount'] / df['close']
 
-        # Introduce seasonality
-        df.loc[:, 'month'] = df.index.month
+        # (close - feature) / feature from Ichimoku cloud
+        df.loc[:, 'close_diff_tenkan_sen_percent'] = (df['close'] - df['tenkan_sen']) / df['tenkan_sen']
+        df.loc[:, 'close_diff_kijun_sen_percent'] = (df['close'] - df['kijun_sen']) / df['kijun_sen']
+        df.loc[:, 'close_diff_senkou_span_a_percent'] = (df['close'] - df['senkou_span_a']) / df['senkou_span_a']
+        df.loc[:, 'close_diff_senkou_span_b_percent'] = (df['close'] - df['senkou_span_b']) / df['senkou_span_b']
 
         # Calculate the 52-week high for each date
         # Compute the current close relative to the 52-week high
@@ -134,70 +143,85 @@ def process_data(data_path, days_into_future=10):
         # Compute the current close relative to the 52-week low
         df['close_to_365_day_low'] = df['close'] / df['close'].rolling(window='365D').min()
 
-        dropna_cols = []
-        for days in range(7, 7 * 13, 7):
+        dropna_cols = [
+            'close_price_diff_1_day', 'crossover_indicator',
+            'close_diff_tenkan_sen_percent', 'close_diff_kijun_sen_percent',
+            'close_diff_senkou_span_a_percent', 'close_diff_senkou_span_b_percent',
+            'rsi', 'rmi', 'mfi', 'macd', 'macd_signal', 'macd_hist', 'days_since_earnings',
+            'close_to_365_day_high', 'close_to_365_day_low',
+            'volume_percent_of_2_week_total', 'dividend_amount_to_close',
+        ]
+
+        for days in [7, 2 * 7, 7 * 10, 7 * 26]:  # range(7, 7 * 13, 7):
             col_high = f'close_to_{days}_day_high'
             col_low = f'close_to_{days}_day_low'
             df[col_high] = df['close'] / df['close'].rolling(window=f'{days}D').max()
             df[col_low] = df['close'] / df['close'].rolling(window=f'{days}D').min()
             dropna_cols.extend([col_high, col_low])
 
-        target_col = f'highest_close_next_{days_into_future}_days_percent'
-        # df.loc[:, target_col] = df['close'].pct_change(offset)
-        df[target_col] = (
-                (
-                        df['close'].shift(-days_into_future).rolling(
-                            window=days_into_future, min_periods=days_into_future).max() - df['close']
-                ) / df['close'])
-
-        # (close - feature) / feature from Ichimoku cloud
-        df.loc[:, 'close_diff_tenkan_sen_percent'] = (df['close'] - df['tenkan_sen']) / df['tenkan_sen']
-        df.loc[:, 'close_diff_kijun_sen_percent'] = (df['close'] - df['kijun_sen']) / df['kijun_sen']
-        df.loc[:, 'close_diff_senkou_span_a_percent'] = (df['close'] - df['senkou_span_a']) / df['senkou_span_a']
-        df.loc[:, 'close_diff_senkou_span_b_percent'] = (df['close'] - df['senkou_span_b']) / df['senkou_span_b']
-
-        target_col = f'highest_close_next_{days_into_future}_days_percent'
-        # df.loc[:, target_col] = df['close'].pct_change(offset)
-        df[target_col] = (
-                                 df['close'].shift(-days_into_future).rolling(window=days_into_future,
-                                                                              min_periods=days_into_future).max() - df[
-                                     'close']
-                         ) / df['close']
-
-        df = df.dropna(subset=[target_col]).copy()
         if df.shape[0] > 0:
-            # Check if p-value is <= 0.05 to confirm stationary series
-            result = adfuller(df[target_col])
-        else:
-            dropped_symbols.append(key)
-            continue
-        if result[1] < 0.05:
-            ### Train when buliish crossover signal is present
-            # If crossover_indicator == -1
-            # and crossover_difference > 0
-            # and signal closes above cloud
-            # then LONG signal
-
-            long_idx = ((df['crossover_indicator'] == -1) & (df['crossover_difference'] > 0) &
-                        (df['close_diff_senkou_span_a_percent'] > 0) & (df['close_diff_senkou_span_b_percent'] > 0))
-
-            df = df.loc[long_idx].copy()
-            df.drop(['open', 'high', 'low', 'close', 'volume', 'dividend_amount',
-                     'tenkan_sen', 'kijun_sen', 'senkou_span_a', 'senkou_span_b',
-                     'chikou_span',  # not a known value in real-time.
-                     ], axis=1, inplace=True)
             df_dict[key] = df.dropna(
-                subset=[
-                           'close_price_diff_1_day', 'crossover_indicator',
-                           'close_diff_tenkan_sen_percent', 'close_diff_kijun_sen_percent',
-                           'close_diff_senkou_span_a_percent', 'close_diff_senkou_span_b_percent',
-                           'rsi', 'rmi', 'mfi', 'macd', 'macd_signal', 'macd_hist', 'days_since_earnings',
-                           'close_to_365_day_high', 'close_to_365_day_low',
-                           'volume_percent_of_2_week_total', 'dividend_amount_to_close',
-                           target_col,
-                       ] + dropna_cols + spy_features).copy()
+                subset=dropna_cols + spy_features
+            ).copy()
         else:
             dropped_symbols.append(key)
-            print('p-value: %f' % result[1])
-            print(f"Dropped {key} because it did not pass the stationary series test")
-    return df_dict, dropped_symbols, target_col
+            print(f"Dropped {key} because it is an empty dataframe")
+    return df_dict, dropped_symbols
+
+def filter_data(df, signal_rule='bullish_cloud_crossover'):
+    idx = get_signal_index(df, signal_rule=signal_rule)
+
+    return df.loc[idx].copy()
+
+
+
+def get_signal_index(df, signal_rule):
+    if signal_rule == 'bullish_cloud_crossover':
+        # Train when bullish crossover signal is present
+        # If crossover_indicator == -1
+        # and crossover_difference > 0
+        # and signal closes above cloud
+        # then LONG signal
+        idx = (
+                (df['crossover_indicator'] == -1) &
+                (df['crossover_difference'] > 0) &
+                (df['close_diff_senkou_span_a_percent'] > 0) &
+                (df['close_diff_senkou_span_b_percent'] > 0)
+        )
+    elif signal_rule == 'bearish_cloud_crossover':
+        # Train when bearish crossover signal is present
+        # If crossover_indicator == -1
+        # and crossover_difference < 0
+        # and signal closes below cloud
+        # then SHORT signal
+        idx = (
+                (df['crossover_indicator'] == -1) &
+                (df['crossover_difference'] < 0) &
+                (df['close_diff_senkou_span_a_percent'] < 0) &
+                (df['close_diff_senkou_span_b_percent'] < 0)
+        )
+    elif signal_rule == 'bullish_and_bearish_cloud_crossover':
+        # Need to determine target
+        idx = (
+                (
+                        (df['crossover_indicator'] == -1) &
+                        (df['crossover_difference'] > 0) &
+                        (df['close_diff_senkou_span_a_percent'] > 0) &
+                        (df['close_diff_senkou_span_b_percent'] > 0)
+                ) |
+                (
+                        (df['crossover_indicator'] == -1) &
+                        (df['crossover_difference'] < 0) &
+                        (df['close_diff_senkou_span_a_percent'] < 0) &
+                        (df['close_diff_senkou_span_b_percent'] < 0)
+                )
+        )
+    else:
+        raise Exception(f'Unknown signal rule {signal_rule}')
+    return idx
+
+
+def evaluate_for_stationary_series(target: pd.Series, test_threshold=0.05):
+    result = adfuller(target)
+
+    return result[1] < test_threshold
