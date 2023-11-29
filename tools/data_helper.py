@@ -6,6 +6,7 @@ import pytz
 from statsmodels.tsa.stattools import adfuller
 import talib
 
+from tools.json_helper import load_dict_from_json
 from tools.pattern_helper import convert_to_polarity, calculate_rmi
 
 
@@ -57,6 +58,8 @@ def process_data(data_path):
     if os.environ.get('TEST_ENV') == 'true':
         data_path = '../../../res/data/s_and_p_study_data_TESTING.h5'
 
+    s_and_p_details = pd.read_csv('../../../res/indices/s_and_p_500_details.csv', index_col=0)
+
     dataframe_keys = get_dataframe_keys(data_path)
     prices_dataframe_keys = [k for k in dataframe_keys if 'prices/' in k]
     events_dataframe_keys = [k for k in dataframe_keys if 'events/' in k]
@@ -101,6 +104,9 @@ def process_data(data_path):
         # Apply the function to each date in df
         df['days_since_earnings'] = df.index.map(lambda date: days_since_earnings(date, earnings_dates_eastern_time))
         df['days_since_earnings'].astype(float)
+
+        # introduce sector info, need to make one-hots
+        df['sector'] = s_and_p_details.Sector.get(symbol, 'UNKNOWN')
 
         # Introduce seasonality
         df.loc[:, 'month'] = df.index.month
@@ -152,7 +158,7 @@ def process_data(data_path):
             'volume_percent_of_2_week_total', 'dividend_amount_to_close',
         ]
 
-        for days in [7, 2 * 7, 7 * 10, 7 * 26]:  # range(7, 7 * 13, 7):
+        for days in range(7, 7 * 26, 7): # [7, 2 * 7, 7 * 10, 7 * 26]:
             col_high = f'close_to_{days}_day_high'
             col_low = f'close_to_{days}_day_low'
             df[col_high] = df['close'] / df['close'].rolling(window=f'{days}D').max()
@@ -168,11 +174,11 @@ def process_data(data_path):
             print(f"Dropped {key} because it is an empty dataframe")
     return df_dict, dropped_symbols
 
+
 def filter_data(df, signal_rule='bullish_cloud_crossover'):
     idx = get_signal_index(df, signal_rule=signal_rule)
 
     return df.loc[idx].copy()
-
 
 
 def get_signal_index(df, signal_rule):
@@ -225,3 +231,6 @@ def evaluate_for_stationary_series(target: pd.Series, test_threshold=0.05):
     result = adfuller(target)
 
     return result[1] < test_threshold
+
+if __name__ == '__main__':
+    process_data('')

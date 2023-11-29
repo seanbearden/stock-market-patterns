@@ -7,18 +7,17 @@ from sklearn.pipeline import Pipeline
 from tools.data_helper import filter_data
 
 
-def train_and_test_pipelines(X_train, y_train, X_test, y_test, pipelines, cv=5, verbose=0):
+def train_and_test_pipelines(X_train, y_train, X_test, y_test, pipelines, grid_search_kwargs=None):
     for label, data in pipelines.items():
         data['pipeline'] = Pipeline(data['steps'])
 
         if 'params_grid' in data.keys():
-            asymmetric_mse_scorer = make_scorer(asymmetric_mean_squared_error, greater_is_better=False)
+            # asymmetric_mse_scorer = make_scorer(modified_mean_squared_log_error, greater_is_better=False)
             grid_search = GridSearchCV(
                 data['pipeline'],
                 data['params_grid'],
-                cv=cv,
-                scoring=asymmetric_mse_scorer,
-                verbose=verbose
+                **grid_search_kwargs
+                # scoring=asymmetric_mse_scorer,
             )
             grid_search.fit(X_train, y_train)
 
@@ -53,6 +52,17 @@ def train_and_test_pipelines(X_train, y_train, X_test, y_test, pipelines, cv=5, 
     return pipelines
 
 
+def modified_mean_squared_log_error(y_true, y_pred):
+    # Use MSLE to penalize underestimates...need to modify to penalize overestimates
+    # Ensure that neither actual_values nor predicted_values contain negative values
+    actual_values_adj = np.maximum((1 + y_true), 0)
+    predicted_values_adj = np.maximum((1 + y_pred / 100), 0)
+    # Swap the actual and predicted values to punish overestimates.
+    modified_msle = mean_squared_log_error(predicted_values_adj, actual_values_adj)
+
+    return modified_msle
+
+
 def asymmetric_mean_squared_error(y_true, y_pred):
     error = y_pred - y_true
     penalty = np.where(error > 0, 1.5, 1.0)  # Increase the weight for overestimates
@@ -60,7 +70,7 @@ def asymmetric_mean_squared_error(y_true, y_pred):
 
 
 def train_test_split_timeseries(df_dict, target_cols, days_into_future, drop_cols, ohlc_col='close', min_date=None,
-                                test_length=1):
+                                test_length=1, test_date=None, drop_earnings=None):
     """"""
     df_full_list = []
     df_test_X_list = []
@@ -88,18 +98,29 @@ def train_test_split_timeseries(df_dict, target_cols, days_into_future, drop_col
         df_full_list.append(df_temp)
 
         df_temp = filter_data(df_temp, signal_rule='bullish_cloud_crossover')
+
+        # remove earnings surprise element...
+        if drop_earnings:
+            df_temp = df_temp[df_temp['days_since_earnings'] < drop_earnings]
+
         df_temp.drop(drop_cols, axis=1, inplace=True)
         df_temp = df_temp.dropna(subset=list(target_cols.keys())).copy()
 
-        end_point = len(df_temp)
-        X = end_point - test_length
-        df_train = df_temp.iloc[:X]
-        df_test = df_temp.iloc[X:]
+        if test_date:
+            df_train = df_temp[df_temp['date'] < test_date]
+            df_test = df_temp[df_temp['date'] >= test_date]
+        else:
+            end_point = len(df_temp)
+            X = end_point - test_length
+            df_train = df_temp.iloc[:X]
+            df_test = df_temp.iloc[X:]
 
-        df_train_X_list.append(df_train.loc[:, [col for col in df_train.columns if col not in target_cols_list]])
-        df_train_y_list.append(df_train[target_cols_list + index_cols])
-        df_test_X_list.append(df_test.loc[:, [col for col in df_test.columns if col not in target_cols_list]])
-        df_test_y_list.append(df_test[target_cols_list + index_cols])
+        if not df_train.empty:
+            df_train_X_list.append(df_train.loc[:, [col for col in df_train.columns if col not in target_cols_list]])
+            df_train_y_list.append(df_train[target_cols_list + index_cols])
+        if not df_test.empty:
+            df_test_X_list.append(df_test.loc[:, [col for col in df_test.columns if col not in target_cols_list]])
+            df_test_y_list.append(df_test[target_cols_list + index_cols])
 
     return {
         'df_full': pd.concat(df_full_list, ignore_index=True),

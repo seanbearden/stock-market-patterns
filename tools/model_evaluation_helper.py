@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+from sklearn.preprocessing import OneHotEncoder
 
 
 def find_first_above_threshold(lst, threshold):
@@ -88,7 +89,7 @@ def get_med_actual_if_pred_above_thresh_fig(predicted_values, actual_values, x=N
     best_pred_thresh = find_x_for_max_difference(x, y)
     ax.axvline(x=best_pred_thresh, color='r', linestyle='-')  # Adding a vertical line
     # Annotating the horizontal line
-    annotation = (f'Predicted value >= {best_pred_thresh}%\nmost likely to underestimate')
+    annotation = (f'Predicted value >= {best_pred_thresh:.2f}%\nmost likely to underestimate')
     ax.text(best_pred_thresh * 0.975, best_pred_thresh, annotation, ha='right', va='center', color='r')
 
     ax.set_title('Median of actual values if predicted value above threshold')
@@ -101,9 +102,46 @@ def get_med_actual_if_pred_above_thresh_fig(predicted_values, actual_values, x=N
 def find_x_for_max_difference(x, y, min_x=0):
     # Calculate the differences
     differences = [y_val - x_val for x_val, y_val in zip(x, y) if x_val > min_x]
-    print(differences)
     # Find the index of the maximum difference
     max_diff_index = differences.index(max(differences))
 
     # Return the corresponding value of x
     return x[max_diff_index]
+
+
+def analyze_signal_for_report():
+    pass
+
+
+def get_feature_names(column_transformer):
+    """
+    Function to get feature names (assuming OneHotEncoder for categorical features)
+
+    Args:
+        column_transformer: transformer used in preprocessing
+
+    Returns:
+        names of features
+    """
+    feature_names = []
+
+    # Loop through each transformer in the ColumnTransformer
+    for transformer_in_columns in column_transformer.transformers_:
+        transformer_name, transformer, cols = transformer_in_columns
+
+        # Check if the transformer isn't "remainder"
+        if transformer_name != "remainder":
+
+            # If it's OneHotEncoder, use feature_names_in_ to get names
+            if isinstance(transformer, OneHotEncoder):
+                for col, categories in zip(cols, transformer.categories_):
+                    feature_names.extend([f'{col}_{cat}' for cat in categories])
+            else:
+                feature_names.extend(cols)
+
+        else:
+            # For 'remainder', add the column names
+
+            feature_names.extend([column_transformer.feature_names_in_[col] for col in cols])
+
+    return feature_names
