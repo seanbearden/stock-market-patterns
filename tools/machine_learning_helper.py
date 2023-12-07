@@ -47,7 +47,7 @@ def train_and_test_pipelines(X_train, y_train, X_test, y_test, pipelines, grid_s
         # Swap the actual and predicted values to punish overestimates.
         modified_msle = mean_squared_log_error(predicted_values_adj, actual_values_adj)
 
-        print("Mean Squared Logarithmic Error:", modified_msle)
+        print("Modified Mean Squared Logarithmic Error:", modified_msle)
 
     return pipelines
 
@@ -63,20 +63,30 @@ def modified_mean_squared_log_error(y_true, y_pred):
     return modified_msle
 
 
-def asymmetric_mean_squared_error(y_true, y_pred):
+def asymmetric_mean_squared_error(y_true, y_pred, multiplier=2):
     error = y_pred - y_true
-    penalty = np.where(error > 0, 1.5, 1.0)  # Increase the weight for overestimates
+    penalty = np.where(error > 0, multiplier, 1.0)  # Increase the weight for overestimates
     return np.mean(penalty * (error ** 2))
+
+
+def asymmetric_squared_error_objective(y_true, y_pred, weight_over=2, weight_under=1):
+    # Calculate error
+    residual = y_pred - y_true
+
+    # Gradient and Hessian
+    grad = np.where(residual > 0, 2 * weight_over * residual, 2 * weight_under * residual)
+    hess = np.where(residual > 0, 2 * weight_over, 2 * weight_under)
+
+    return grad, hess
 
 
 def train_test_split_timeseries(df_dict, target_cols, days_into_future, drop_cols, ohlc_col='close', min_date=None,
                                 test_length=1, test_date=None, drop_earnings=None):
     """"""
     df_full_list = []
-    df_test_X_list = []
-    df_test_y_list = []
-    df_train_X_list = []
-    df_train_y_list = []
+    df_train_list = []
+    df_test_list = []
+
     index_cols = ['symbol', 'date']
     target_cols_list = list(target_cols.keys())
     for key, df in df_dict.items():
@@ -116,17 +126,25 @@ def train_test_split_timeseries(df_dict, target_cols, days_into_future, drop_col
             df_test = df_temp.iloc[X:]
 
         if not df_train.empty:
-            df_train_X_list.append(df_train.loc[:, [col for col in df_train.columns if col not in target_cols_list]])
-            df_train_y_list.append(df_train[target_cols_list + index_cols])
+            df_train_list.append(df_train)
         if not df_test.empty:
-            df_test_X_list.append(df_test.loc[:, [col for col in df_test.columns if col not in target_cols_list]])
-            df_test_y_list.append(df_test[target_cols_list + index_cols])
+            df_test_list.append(df_test)
+
+    df_train_full = pd.concat(df_train_list, ignore_index=True)
+    df_train_full.sort_values(by='date', ascending=True, inplace=True)
+    df_train_X_index = df_train_full.loc[:, [col for col in df_train_full.columns if col not in target_cols_list]]
+    df_train_y_index = df_train_full[target_cols_list + index_cols]
+
+    df_test_full = pd.concat(df_test_list, ignore_index=True)
+    df_test_full.sort_values(by='date', ascending=True, inplace=True)
+    df_test_X_index = df_test_full.loc[:, [col for col in df_test_full.columns if col not in target_cols_list]]
+    df_test_y_index = df_test_full[target_cols_list + index_cols]
 
     return {
         'df_full': pd.concat(df_full_list, ignore_index=True),
-        'df_train_X_index': pd.concat(df_train_X_list, ignore_index=True),
-        'df_train_y_index': pd.concat(df_train_y_list, ignore_index=True),
-        'df_test_X_index': pd.concat(df_test_X_list, ignore_index=True),
-        'df_test_y_index': pd.concat(df_test_y_list, ignore_index=True),
+        'df_train_X_index': df_train_X_index,
+        'df_train_y_index': df_train_y_index,
+        'df_test_X_index': df_test_X_index,
+        'df_test_y_index': df_test_y_index,
         'index_cols': index_cols
     }

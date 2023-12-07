@@ -53,7 +53,17 @@ def get_earnings_dates(df):
     return earnings_dates_eastern_time
 
 
-def process_data(data_path):
+def process_data(data_path, number_of_shifts=13, spy_number_of_shifts=13, shift_step=10):
+    week_multiplier = 2
+    high_low_rolling_calendar_days = range(week_multiplier * 7, 13 * week_multiplier * 7, week_multiplier * 7)
+
+    dropna_cols = [
+        'close_price_diff_1_day', 'crossover_indicator',
+        'rsi', 'rmi', 'mfi', 'macd', 'macd_signal', 'macd_hist', 'days_since_earnings',
+        'close_to_365_day_high', 'close_to_365_day_low',
+        'volume_percent_of_2_week_total', 'dividend_amount_to_close',
+    ]
+
     # Use reduced data file for testing
     if os.environ.get('TEST_ENV') == 'true':
         data_path = '../../../res/data/s_and_p_study_data_TESTING.h5'
@@ -65,18 +75,38 @@ def process_data(data_path):
     events_dataframe_keys = [k for k in dataframe_keys if 'events/' in k]
     index_dataframe_keys = [k for k in dataframe_keys if 'indices/' in k]
 
-    spy_df = pd.read_hdf(data_path, 'indices/SPY')
-    spy_df = make_index_eastern(spy_df)
+    index_dfs = []
+    ind_features = []
+    for ind in ['SPY', 'QQQ', 'DIA']:
 
-    spy_df.loc[:, 'spy_close_diff_tenkan_sen_percent'] = (spy_df['close'] - spy_df['tenkan_sen']) / spy_df['tenkan_sen']
-    spy_df.loc[:, 'spy_close_diff_kijun_sen_percent'] = (spy_df['close'] - spy_df['kijun_sen']) / spy_df['kijun_sen']
-    spy_df.loc[:, 'spy_close_diff_senkou_span_a_percent'] = (spy_df['close'] - spy_df['senkou_span_a']) / spy_df[
-        'senkou_span_a']
-    spy_df.loc[:, 'spy_close_diff_senkou_span_b_percent'] = (spy_df['close'] - spy_df['senkou_span_b']) / spy_df[
-        'senkou_span_b']
+        ind_df = pd.read_hdf(data_path, f'indices/{ind}')
+        ind_df = make_index_eastern(ind_df)
 
-    spy_features = ['spy_close_diff_tenkan_sen_percent', 'spy_close_diff_kijun_sen_percent',
-                    'spy_close_diff_senkou_span_a_percent', 'spy_close_diff_senkou_span_b_percent']
+        ind_df.loc[:, f'{ind}_close_diff_tenkan_sen_percent'] = (ind_df['close'] - ind_df['tenkan_sen']) / ind_df['tenkan_sen']
+        ind_df.loc[:, f'{ind}_close_diff_kijun_sen_percent'] = (ind_df['close'] - ind_df['kijun_sen']) / ind_df['kijun_sen']
+        ind_df.loc[:, f'{ind}_close_diff_senkou_span_a_percent'] = (ind_df['close'] - ind_df['senkou_span_a']) / ind_df[
+            'senkou_span_a']
+        ind_df.loc[:, f'{ind}_close_diff_senkou_span_b_percent'] = (ind_df['close'] - ind_df['senkou_span_b']) / ind_df[
+            'senkou_span_b']
+
+        features = [
+                f'{ind}_close_diff_tenkan_sen_percent', f'{ind}_close_diff_kijun_sen_percent',
+                f'{ind}_close_diff_senkou_span_a_percent', f'{ind}_close_diff_senkou_span_b_percent'
+            ]
+
+        ind_features.extend(features)
+
+        ind_df, shift_features = add_shifted_columns(ind_df, features, spy_number_of_shifts, shift_step=shift_step)
+        ind_features.extend(shift_features)
+
+        index_dfs.append(ind_df.copy())
+
+    # Initialize merged_df with the first dataframe
+    ind_df = index_dfs[0]
+
+    # Loop through the remaining dataframes and merge
+    for df_temp in index_dfs[1:]:
+        ind_df = pd.merge(ind_df, df_temp, left_index=True, right_index=True, how='outer')
 
     df_dict = {}
     dropped_symbols = []
@@ -87,7 +117,7 @@ def process_data(data_path):
         df = pd.read_hdf(data_path, key)
         df = make_index_eastern(df)
 
-        df = df.merge(spy_df[spy_features], left_index=True, right_index=True, how='left')
+        df = df.merge(ind_df[ind_features], left_index=True, right_index=True, how='left')
 
         # tech debt: perform this conversion when saving events to h5
         # get earnings dates
@@ -142,6 +172,13 @@ def process_data(data_path):
         df.loc[:, 'close_diff_senkou_span_a_percent'] = (df['close'] - df['senkou_span_a']) / df['senkou_span_a']
         df.loc[:, 'close_diff_senkou_span_b_percent'] = (df['close'] - df['senkou_span_b']) / df['senkou_span_b']
 
+        cloud_features = ['close_diff_tenkan_sen_percent', 'close_diff_kijun_sen_percent',
+                        'close_diff_senkou_span_a_percent', 'close_diff_senkou_span_b_percent']
+        dropna_cols.extend(cloud_features)
+
+        df, shift_cloud_features = add_shifted_columns(df, cloud_features, number_of_shifts, shift_step=shift_step)
+        dropna_cols.extend(shift_cloud_features)
+
         # Calculate the 52-week high for each date
         # Compute the current close relative to the 52-week high
         df['close_to_365_day_high'] = df['close'] / df['close'].rolling(window='365D').max()
@@ -149,16 +186,7 @@ def process_data(data_path):
         # Compute the current close relative to the 52-week low
         df['close_to_365_day_low'] = df['close'] / df['close'].rolling(window='365D').min()
 
-        dropna_cols = [
-            'close_price_diff_1_day', 'crossover_indicator',
-            'close_diff_tenkan_sen_percent', 'close_diff_kijun_sen_percent',
-            'close_diff_senkou_span_a_percent', 'close_diff_senkou_span_b_percent',
-            'rsi', 'rmi', 'mfi', 'macd', 'macd_signal', 'macd_hist', 'days_since_earnings',
-            'close_to_365_day_high', 'close_to_365_day_low',
-            'volume_percent_of_2_week_total', 'dividend_amount_to_close',
-        ]
-
-        for days in range(7, 7 * 26, 7): # [7, 2 * 7, 7 * 10, 7 * 26]:
+        for days in high_low_rolling_calendar_days:
             col_high = f'close_to_{days}_day_high'
             col_low = f'close_to_{days}_day_low'
             df[col_high] = df['close'] / df['close'].rolling(window=f'{days}D').max()
@@ -167,7 +195,7 @@ def process_data(data_path):
 
         if df.shape[0] > 0:
             df_dict[key] = df.dropna(
-                subset=dropna_cols + spy_features
+                subset=dropna_cols + ind_features
             ).copy()
         else:
             dropped_symbols.append(key)
@@ -227,10 +255,30 @@ def get_signal_index(df, signal_rule):
     return idx
 
 
+def add_shifted_columns(df, column_names, number_of_shifts, shift_step=1):
+    """
+    Adds shifted columns to the DataFrame for multiple columns with a specified shift step.
+
+    :param df: Pandas DataFrame
+    :param column_names: List of column names to be shifted
+    :param number_of_shifts: Number of shifted columns to add for each column
+    :param shift_step: The step size for each shift
+    :return: DataFrame and List of newly added column names
+    """
+    new_columns = []
+    for column_name in column_names:
+        for n in range(1, number_of_shifts + 1):
+            shift_amount = n * shift_step
+            shifted_column_name = f"{column_name}_shifted_{shift_amount}"
+            df[shifted_column_name] = df[column_name].shift(shift_amount)
+            new_columns.append(shifted_column_name)
+    return df.copy(), new_columns
+
+
 def evaluate_for_stationary_series(target: pd.Series, test_threshold=0.05):
     result = adfuller(target)
 
     return result[1] < test_threshold
 
 if __name__ == '__main__':
-    process_data('')
+    process_data('../../../res/data/s_and_p_study_data_TESTING.h5')
