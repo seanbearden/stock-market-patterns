@@ -1,5 +1,5 @@
 import psycopg2
-from tools import get_ticker_data, scrape_earnings_dates
+from tools import get_ticker_data, scrape_events
 from tools.database_helper import *
 
 save_type = 'psql'
@@ -49,7 +49,7 @@ type_to_table = {
     'chartEvent/split': tables['split_table']
 }
 
-scrape_earnings_dates.main(
+scrape_events.main(
     ticker_symbols=all_symbols,
     tables=tables,
     save_type=save_type,

@@ -18,7 +18,10 @@ GRANT ALL ON SCHEMA public TO your_username;
 ```
 - run [get_data.py](src/get_data.py) to create tables and populate database.
 
+![Stock Database Diagram](res/images/stock_database_diagram.png)
+
+
 # Data gathering
-- run `get_ticker_data.py` to get S&P 500 historical daily candles from Alphavantage API.
-- run `scrape_earnings_dates.py` to scrape S&P 500 historical earnings dates from Finviz.
+- run [get_ticker_data.py](tools/get_ticker_data.py) to get historical daily candles from Alphavantage API.
+- run [scrape_events.py](tools/scrape_events.py) to scrape earnings, dividends, and split dates and info from Finviz.
 
