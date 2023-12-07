@@ -4,12 +4,48 @@ from selenium.webdriver.support import expected_conditions as EC
 import json
 import os
 import pandas as pd
+import psycopg2
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 import time
+from tools.database_helper import get_ticker_id
 
 
-def main(path):
+def main(ticker_symbols,
+        save_type='psql', reference_table='tickers',
+        path=None, tables=None, conn=None, cur=None):
+    if save_type == 'psql':
+        type_to_table = {
+            'chartEvent/earnings': tables['earnings_table'],
+            'chartEvent/dividends': tables['dividends_table'],
+            'chartEvent/split': tables['split_table']
+        }
+
+        queries = {
+            'chartEvent/earnings':
+                """
+                INSERT INTO {} (ticker_id, date_timestamp, fiscal_period, fiscal_end_date, eps_actual, eps_estimate, 
+                eps_reported_actual, eps_reported_estimate, 
+                sales_actual, sales_estimate)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (ticker_id, date_timestamp) DO NOTHING;
+                """.format(type_to_table['chartEvent/earnings']),
+            'chartEvent/dividends':
+                """
+                INSERT INTO {} (ticker_id, date_timestamp, ordinary, special)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (ticker_id, date_timestamp) DO NOTHING;
+                """.format(type_to_table['chartEvent/dividends']),
+            'chartEvent/split':
+                """
+                INSERT INTO {} (ticker_id, date_timestamp, factor_from, factor_to)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (ticker_id, date_timestamp) DO NOTHING;
+                """.format(type_to_table['chartEvent/split'])
+        }
+
+
+
     # Replace 'your_username' and 'your_password' with your login credentials.
     USERNAME = os.environ['FINVIZ_USERNAME']
     PASSWORD = os.environ['FINVIZ_PASSWORD']
@@ -45,11 +81,8 @@ def main(path):
     # Wait for the post-login page to load
     time.sleep(2)
 
-    sandp500_df = pd.read_csv('res/indices/s_and_p_500_details.csv')
-
-    for symbol in sandp500_df['Ticker']:
-        print(symbol)
-        DATA_URL = f'https://elite.finviz.com/quote.ashx?t={symbol}&p=d'
+    for ticker_symbol in ticker_symbols:
+        DATA_URL = f'https://elite.finviz.com/quote.ashx?t={ticker_symbol}&p=d'
 
         # Navigate to the URL from which you want to scrape data
         driver.get(DATA_URL)
@@ -73,11 +106,48 @@ def main(path):
         event_df = pd.DataFrame.from_dict(data['chartEvents'])
         event_df['dateTimestamp'] = pd.to_datetime(event_df['dateTimestamp'], unit='s')
 
-        with pd.HDFStore(path, mode='a') as store:
-            # Save each DataFrame to the store
-            store.put('events/' + symbol, event_df, format='table', data_columns=True)
-
+        if save_type == 'hdf5':
+            save_hdf5('events/' + ticker_symbol, event_df, path)
+        elif save_type == 'psql':
+            ticker_id = get_ticker_id(cur, ticker_symbol, reference_table=reference_table)
+            if not ticker_id:
+                print(f'Ticker symbol not in reference table: {ticker_symbol}')
+                continue
+            save_sql(conn, cur, ticker_id, queries, event_df)
+        else:
+            raise Exception('Unknown save type. Choose from "hdf5" or "psql"')
         time.sleep(3)
     # Quit the driver
     driver.quit()
+
+
+def save_hdf5(loc, event_df, path):
+    with pd.HDFStore(path, mode='a') as store:
+        # Save each DataFrame to the store
+        store.put(loc, event_df, format='table', data_columns=True)
+
+
+def save_sql(conn, cur, ticker_id, queries, data):
+    # Insert data into PostgreSQL database
+    for index, row in data.iterrows():
+        event_type = row['eventType']
+        if event_type == 'chartEvent/earnings':
+            cur.execute(
+                queries[event_type],
+                (ticker_id, row.get('dateTimestamp'), row.get('fiscalPeriod'), row.get('fiscalEndDate'), row.get('epsActual'),
+                 row.get('epsEstimate'), row.get('epsReportedActual'), row.get('epsReportedEstimate'), row.get('salesActual'), row.get('salesEstimate'))
+            )
+        elif event_type == 'chartEvent/dividends':
+            cur.execute(
+                queries[event_type],
+                (ticker_id, row.get('dateTimestamp'), row.get('ordinary'), row.get('special'))
+            )
+        elif event_type == 'chartEvent/split':
+            cur.execute(
+                queries[event_type],
+                (ticker_id, row.get('dateTimestamp'), row.get('factorFrom'), row.get('factorTo'))
+            )
+        else:
+            raise Exception(f'Unknown event type {event_type}')
+    conn.commit()
 
