@@ -25,3 +25,6 @@ GRANT ALL ON SCHEMA public TO your_username;
 - run [get_ticker_data.py](tools/get_ticker_data.py) to get historical daily candles from Alphavantage API.
 - run [scrape_events.py](tools/scrape_events.py) to scrape earnings, dividends, and split dates and info from Finviz.
 
+# Packages
+- using a version of alpha_vantage from [https://github.
+  com/masonJamesWheeler/alpha_vantage/tree/intraday_monthly_update](https://github.com/masonJamesWheeler/alpha_vantage/tree/intraday_monthly_update)

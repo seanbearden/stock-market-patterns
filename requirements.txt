@@ -1,7 +1,7 @@
 absl-py==2.0.0
 aiohttp==3.8.6
 aiosignal==1.3.1
-alpha-vantage==2.3.1
+-e git+https://github.com/seanbearden/alpha_vantage.git@36eafb120b6735bbc659cf2bcc2de603084c28e1#egg=alpha_vantage
 anyio==4.0.0
 appdirs==1.4.4
 appnope==0.1.3
@@ -111,6 +111,7 @@ prometheus-client==0.18.0
 prompt-toolkit==3.0.39
 protobuf==4.25.0
 psutil==5.9.6
+psycopg2-binary==2.9.9
 ptyprocess==0.7.0
 pure-eval==0.2.2
 py-cpuinfo==9.0.0
