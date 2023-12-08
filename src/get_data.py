@@ -37,25 +37,27 @@ all_symbols = get_all_ticker_symbols(cur, reference_table=tables['reference_tabl
 # download and save ticker data
 get_ticker_data.main(
     all_symbols,
-    table=tables['stock_quotes_daily_table'],
     save_type=save_type,
-    outputsize=outputsize)
-
-# --- Chart Events ----
-
-type_to_table = {
-    'chartEvent/earnings': tables['earnings_table'],
-    'chartEvent/dividends': tables['dividends_table'],
-    'chartEvent/split': tables['split_table']
-}
-
-scrape_events.main(
-    ticker_symbols=all_symbols,
-    tables=tables,
-    save_type=save_type,
+    outputsize=outputsize,
     conn=conn,
     cur=cur
 )
+
+# --- Chart Events ----
+
+# type_to_table = {
+#     'chartEvent/earnings': tables['earnings_table'],
+#     'chartEvent/dividends': tables['dividends_table'],
+#     'chartEvent/split': tables['split_table']
+# }
+#
+# scrape_events.main(
+#     ticker_symbols=all_symbols,
+#     tables=tables,
+#     save_type=save_type,
+#     conn=conn,
+#     cur=cur
+# )
 
 cur.close()
 conn.close()

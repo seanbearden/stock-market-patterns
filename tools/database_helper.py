@@ -66,13 +66,14 @@ def update_reference_table(conn, cur, directory, filename_to_index, reference_ta
 
 
 def create_stock_database_tables(conn, cur):
-
+    table_prefix = 'stock_quotes'
     tables = {
         'reference_table': 'tickers',
-        'stock_quotes_daily_table': 'stock_quotes_daily',
+        'stock_quotes_daily_table': f'{table_prefix}_daily',
         'earnings_table': 'earnings',
         'dividends_table': 'dividends',
-        'split_table': 'split'
+        'split_table': 'split',
+        'meta_data_table': f'{table_prefix}_metadata'
     }
     reference_table = tables['reference_table']
 
@@ -90,6 +91,23 @@ def create_stock_database_tables(conn, cur):
     """)
     conn.commit()
 
+    metadata_table = tables['meta_data_table']
+
+    cur.execute(f"""
+           CREATE TABLE IF NOT EXISTS {metadata_table} (
+               metadata_id SERIAL PRIMARY KEY,
+               ticker_id INT NOT NULL,
+               datetime TIMESTAMP NOT NULL,
+               information TEXT,
+               last_refreshed TIMESTAMP,
+               interval TEXT,
+               output_size TEXT,
+               time_zone TEXT,
+               FOREIGN KEY (ticker_id) REFERENCES {reference_table}(ticker_id)
+           );
+       """)
+    conn.commit()
+
     stock_quotes_daily_table = tables['stock_quotes_daily_table']
 
     cur.execute(f"""
@@ -97,6 +115,7 @@ def create_stock_database_tables(conn, cur):
             id SERIAL PRIMARY KEY,
             ticker_id INT NOT NULL,
             date DATE NOT NULL,
+            metadata_id INT NOT NULL,
             open FLOAT,
             high FLOAT,
             low FLOAT,
@@ -106,6 +125,7 @@ def create_stock_database_tables(conn, cur):
             dividend_amount FLOAT,
             split_coefficient FLOAT,
             FOREIGN KEY (ticker_id) REFERENCES {reference_table}(ticker_id),
+            FOREIGN KEY (metadata_id) REFERENCES {metadata_table}(metadata_id),
             UNIQUE (ticker_id, date)
         );
     """)
