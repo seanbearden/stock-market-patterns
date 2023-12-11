@@ -1,4 +1,12 @@
-def calculate_ichimoku(df):
+import pandas as pd
+
+
+def calculate_ichimoku(df, future=False):
+    if future:
+        num_rows_to_add = 26  # number of blank rows you want to add
+        empty_df = pd.DataFrame([{}] * num_rows_to_add)
+        df = pd.concat([df, empty_df]).reset_index(drop=True)
+
     high_prices = df['high']
     close_prices = df['close']
     low_prices = df['low']
@@ -33,26 +41,24 @@ def calculate_rmi(data, time_period=14, momentum_period=5):
     """
     Calculate the Relative Momentum Index (RMI) for a given Pandas Series.
 
+    The definition of RMI is not well documented. This function is in alignment with RMI on Thinkorswim
+
     :param data: Pandas Series of prices.
     :param time_period: The period for calculating RMI. Default is 14.
     :param momentum_period: The period for calculating momentum. Default is 5.
     :return: Pandas Series of RMI values.
     """
-    # Calculate momentum
-    momentum = data.diff(momentum_period)
 
-    # Calculate gains and losses
-    gain = momentum.clip(lower=0)
-    loss = -momentum.clip(upper=0)
+    momentum = data.diff(periods=momentum_period)
+    # Calculate U and D
+    U = momentum.where(momentum > 0, 0)
+    D = -momentum.where(momentum < 0, 0)
 
-    # Calculate average gains and losses
-    avg_gain = gain.rolling(window=time_period, min_periods=time_period).mean()
-    avg_loss = loss.rolling(window=time_period, min_periods=time_period).mean()
+    # Calculate the EMA of U and D
+    EMA_U = U.ewm(span=time_period, adjust=False).mean()
+    EMA_D = D.ewm(span=time_period, adjust=False).mean()
 
-    # Calculate RS (Relative Strength)
-    RS = avg_gain / avg_loss
-
-    # Calculate RMI
-    RMI = 100 - (100 / (1 + RS))
-
+    # Calculate the RMI
+    RMI = 100 * EMA_U / (EMA_U + EMA_D)
     return RMI
+
