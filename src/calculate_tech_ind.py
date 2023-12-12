@@ -1,9 +1,17 @@
 import os
 import pandas as pd
-from sqlalchemy import create_engine, text
+import psycopg2
 import talib
 from tools.database_helper import get_all_ticker_symbols
 from tools.pattern_helper import calculate_ichimoku, calculate_rmi
+from io import StringIO
+
+
+# Define the table name
+stock_quotes_daily_table = 'stock_quotes_daily'
+stock_quotes_daily_ti_table = 'stock_quotes_daily_ti'
+sma_periods = [20, 50, 200]
+update = False
 
 # Database connection parameters
 db_params = {
@@ -14,67 +22,131 @@ db_params = {
     'port': '5432'
 }
 
-# SQLAlchemy engine for PostgreSQL
-engine = create_engine(
-    f"postgresql://{db_params['user']}:{db_params['password']}@{db_params['host']}:{db_params['port']}/{db_params['dbname']}")
+# Connect to your postgres DB
+conn = psycopg2.connect(**db_params)
 
-with engine.connect() as connection:
-    drop_columns = ['high', 'low', 'close', 'volume']
+# Open a cursor to perform database operations
+cur = conn.cursor()
 
-    # Fetch distinct ticker ids
-    result = connection.execute(text("""SELECT DISTINCT ticker_id FROM tickers"""))
-    ticker_ids = result.fetchall()
+drop_columns = ['high', 'low', 'close', 'volume']
 
-    for ticker_id in ticker_ids:
-        query = text(f"""
-            SELECT id, {','.join(drop_columns)}
-            FROM stock_quotes_daily
-            WHERE ticker_id = {ticker_id[0]}
-            ORDER BY date ASC;
-            """)
+# Fetch distinct ticker ids
+cur.execute("""SELECT DISTINCT ticker_id FROM tickers""")
+ticker_ids = cur.fetchall()
 
-        result = connection.execute(query)
-        rows = result.fetchall()
-        colnames = result.keys()
+for ticker_id in ticker_ids:
 
-        df = pd.DataFrame(rows, columns=colnames)
+    # Apply split coefficient to past, but not to day of split
 
-        for timeperiod in [20, 50, 200]:
-            df[f'sma_{timeperiod}'] = talib.SMA(df['close'], timeperiod=timeperiod)
+    query = f"""
+        WITH stock_date_adjusted AS (
+            SELECT
+                *, 
+                COALESCE(
+                    EXP(
+                        SUM(LN(split_coefficient)) OVER (
+                            ORDER BY date DESC ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
+                        )
+                    ), 1
+                ) AS cumulative_split
+            FROM
+                stock_quotes_daily
+            WHERE 
+                ticker_id = {ticker_id[0]}
+        )
+        SELECT    
+            id,        
+            high / cumulative_split AS high,
+            low / cumulative_split AS low,
+            close / cumulative_split AS close,
+            volume * cumulative_split AS volume
+        FROM
+            stock_date_adjusted
+        WHERE 
+            ticker_id = {ticker_id[0]}
+        ORDER BY
+            date;
+    """
 
-        # Technical Indicators
-        timeperiod = 14
-        df[f'rsi_{timeperiod}'] = talib.RSI(df['close'], timeperiod=timeperiod)
-        df[f'mfi_{timeperiod}'] = talib.MFI(high=df['high'], low=df['low'], close=df['close'], volume=df['volume'],
-                                            timeperiod=timeperiod)
-        momentum_period = 5
-        df[f'rmi_{timeperiod}_{momentum_period}'] = calculate_rmi(df['close'], time_period=timeperiod,
-                                                                  momentum_period=momentum_period)
+    cur.execute(query)
+    rows = cur.fetchall()
+    colnames = [desc[0] for desc in cur.description]
 
-        fastperiod = 12
-        slowperiod = 26
-        signalperiod = 9
+    df = pd.DataFrame(rows, columns=colnames)
 
-        macd = talib.MACD(df['close'], fastperiod=fastperiod, slowperiod=slowperiod, signalperiod=signalperiod)
-        df[f'macd_{fastperiod}_{slowperiod}_{signalperiod}'] = macd[0]
-        df[f'macd_signal_{fastperiod}_{slowperiod}_{signalperiod}'] = macd[1]
-        df[f'macd_hist_{fastperiod}_{slowperiod}_{signalperiod}'] = macd[2]
+    for timeperiod in sma_periods:
+        df[f'sma_{timeperiod}'] = talib.SMA(df['close'], timeperiod=timeperiod)
 
-        df = calculate_ichimoku(df)
+    # Technical Indicators
+    timeperiod = 14
+    df[f'rsi_{timeperiod}'] = talib.RSI(df['close'], timeperiod=timeperiod)
+    df[f'mfi_{timeperiod}'] = talib.MFI(high=df['high'], low=df['low'], close=df['close'], volume=df['volume'],
+                                        timeperiod=timeperiod)
+    momentum_period = 5
+    df[f'rmi_{timeperiod}_{momentum_period}'] = calculate_rmi(
+        df['close'],
+        time_period=timeperiod,
+        momentum_period=momentum_period)
 
-        df.rename(columns={
-            'tenkan_sen': 'ic_conversion_9_26_52',
-            'kijun_sen': 'ic_base_9_26_52',
-            'senkou_span_a': 'ic_span_a_9_26_52',
-            'senkou_span_b': 'ic_span_b_9_26_52'
-        }, inplace=True)
+    fastperiod = 12
+    slowperiod = 26
+    signalperiod = 9
 
-        df.drop(drop_columns + ['chikou_span'], axis=1, inplace=True)
+    macd = talib.MACD(df['close'], fastperiod=fastperiod, slowperiod=slowperiod, signalperiod=signalperiod)
+    df[f'macd_{fastperiod}_{slowperiod}_{signalperiod}'] = macd[0]
+    df[f'macd_signal_{fastperiod}_{slowperiod}_{signalperiod}'] = macd[1]
+    df[f'macd_hist_{fastperiod}_{slowperiod}_{signalperiod}'] = macd[2]
 
-        # Define the table name
-        stock_quotes_daily_ti_table = 'stock_quotes_daily_ti'
+    df = calculate_ichimoku(df, future=False)
+
+    df.rename(columns={
+        'tenkan_sen': 'ic_conversion_9_26_52',
+        'kijun_sen': 'ic_base_9_26_52',
+        'senkou_span_a': 'ic_span_a_9_26_52',
+        'senkou_span_b': 'ic_span_b_9_26_52'
+    }, inplace=True)
+
+    df.drop(drop_columns + ['chikou_span'], axis=1, inplace=True)
+
+    # Insert the DataFrame into the PostgreSQL table
+
+    # which rows exist and need to be updated?
+    # get ids for ticker_id that exist in ti table
+    cur.execute(f"""
+        SELECT ti.id 
+        FROM {stock_quotes_daily_ti_table} as ti
+        INNER JOIN stock_quotes_daily as s
+        ON ti.id = s.id
+        WHERE s.ticker_id = {ticker_id[0]}
+        """)
+    existing_ids = [i[0] for i in cur.fetchall()]
+
+    idx = df.id.isin(existing_ids)
+    df_existing = df[idx]
+    df_new = df[~idx]
+
+    # Define the PostgreSQL columns for the table
+    columns = df.columns.tolist()
+
+    # Bulk insert new records
+    if not df_new.empty:
+        # Prepare the data to be inserted into PostgreSQL table
+        output = StringIO()
+        df.to_csv(output, sep='\t', header=False, index=False)
+        output.seek(0)
 
         # Insert the DataFrame into the PostgreSQL table
-        df.to_sql(stock_quotes_daily_ti_table, engine, if_exists='replace', index=False, method='multi')
-        break
-# The engine connection is automatically closed when exiting the 'with' block
+        cur.copy_from(output, stock_quotes_daily_ti_table, null='', columns=columns)
+        conn.commit()
+
+    # Update existing records
+    if update and not df_existing.empty:
+        for index, row in df_existing.iterrows():
+            update_query = (f"UPDATE {stock_quotes_daily_ti_table} SET " +
+                            ", ".join([f"{col} = %s" for col in columns if col != 'id']) +
+                            " WHERE id = %s")
+            cur.execute(update_query, tuple(row[col] for col in columns if col != 'id') + (row['id'],))
+        conn.commit()
+
+cur.close()
+conn.close()
