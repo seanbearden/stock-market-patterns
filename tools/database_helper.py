@@ -131,28 +131,44 @@ def create_stock_database_tables(conn, cur):
     """)
     conn.commit()
 
-    stock_quotes_daily_ti_table = f"{tables['stock_quotes_daily_table']}_ti"
+    stock_quotes_daily_adj_table = f"{tables['stock_quotes_daily_table']}_adj"
+    cur.execute(f"""
+            CREATE TABLE IF NOT EXISTS {stock_quotes_daily_adj_table} (
+                id INTEGER NOT NULL,
+                date DATE NOT NULL,
+                open FLOAT,
+                high FLOAT,
+                low FLOAT,
+                close FLOAT,
+                volume FLOAT,
+                PRIMARY KEY (id),
+                FOREIGN KEY (id) REFERENCES {994}(id)
+            );
+        """)
+    conn.commit()
+
+    stock_quotes_daily_ti_table = f"{stock_quotes_daily_adj_table}_ti"
 
     cur.execute(f"""
-        CREATE TABLE {stock_quotes_daily_ti_table} (
-        id INTEGER NOT NULL,
-        sma_20 FLOAT,
-        sma_50 FLOAT,
-        sma_200 FLOAT,
-        rsi_14 FLOAT,
-        mfi_14 FLOAT,
-        rmi_14_5 FLOAT,
-        macd_12_26_9 FLOAT,
-        macd_signal_12_26_9 FLOAT,
-        macd_hist_12_26_9 FLOAT,
-        ic_conversion_9_26_52 FLOAT,
-        ic_base_9_26_52 FLOAT,
-        ic_span_a_9_26_52 FLOAT,
-        ic_span_b_9_26_52 FLOAT,
-        PRIMARY KEY (id),
-        FOREIGN KEY (id) REFERENCES {stock_quotes_daily_table}(id)
-    );
-    """)
+            CREATE TABLE IF NOT EXISTS {stock_quotes_daily_ti_table} (
+            id INTEGER NOT NULL,
+            sma_20 FLOAT,
+            sma_50 FLOAT,
+            sma_200 FLOAT,
+            rsi_14 FLOAT,
+            mfi_14 FLOAT,
+            rmi_14_5 FLOAT,
+            macd_12_26_9 FLOAT,
+            macd_signal_12_26_9 FLOAT,
+            macd_hist_12_26_9 FLOAT,
+            ic_conversion_9_26_52 FLOAT,
+            ic_base_9_26_52 FLOAT,
+            ic_span_a_9_26_52 FLOAT,
+            ic_span_b_9_26_52 FLOAT,
+            PRIMARY KEY (id),
+            FOREIGN KEY (id) REFERENCES {stock_quotes_daily_adj_table}(id)
+        );
+        """)
     conn.commit()
 
     earnings_table = tables['earnings_table']
